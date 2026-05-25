@@ -260,23 +260,7 @@ function PrintProductCard({
         {product.image_urls[0] ? <img src={product.image_urls[0]} alt="" /> : <span>No Image</span>}
       </div>
       <div className="print-product-body">
-        <div className="print-product-path">
-          {[product.brand?.name, product.subcategory?.name, product.second_subcategory?.name].filter(Boolean).join(" / ")}
-        </div>
         <h6>{product.name}</h6>
-        <p>{product.description}</p>
-        <div className="print-product-meta">
-          {product.sku ? <span>SKU: {product.sku}</span> : null}
-          {product.pack_size ? <span>Pack: {product.pack_size}</span> : null}
-          <span>{product.availability}</span>
-        </div>
-        {product.highlights.length > 0 ? (
-          <ul>
-            {product.highlights.slice(0, 4).map((highlight) => (
-              <li key={highlight}>{highlight}</li>
-            ))}
-          </ul>
-        ) : null}
         <div className="print-price-row">
           <span>
             <small>MRP</small>

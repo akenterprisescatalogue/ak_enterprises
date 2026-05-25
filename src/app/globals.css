@@ -1706,8 +1706,6 @@ select:disabled {
   .print-cover-meta span,
   .print-title-block span,
   .print-title-block p,
-  .print-product-path,
-  .print-product-meta,
   .print-price-row small {
     color: #637083;
   }
@@ -1799,9 +1797,9 @@ select:disabled {
 
   .print-product-card {
     display: grid;
-    grid-template-columns: 31mm minmax(0, 1fr);
+    grid-template-columns: 26mm minmax(0, 1fr);
     gap: 3mm;
-    min-height: 42mm;
+    min-height: 32mm;
     padding: 3mm;
     border: 1px solid #dbe7f4;
     break-inside: avoid;
@@ -1810,8 +1808,8 @@ select:disabled {
 
   .print-product-media {
     display: grid;
-    width: 31mm;
-    height: 31mm;
+    width: 26mm;
+    height: 26mm;
     place-items: center;
     overflow: hidden;
     color: #637083;
@@ -1828,12 +1826,11 @@ select:disabled {
 
   .print-product-body {
     display: grid;
-    gap: 1.8mm;
+    align-content: center;
+    gap: 2mm;
     min-width: 0;
   }
 
-  .print-product-path,
-  .print-product-meta,
   .print-price-row small {
     font-size: 7.5pt;
     font-weight: 800;
@@ -1844,29 +1841,6 @@ select:disabled {
     color: #102033;
     font-size: 10.5pt;
     line-height: 1.2;
-  }
-
-  .print-product-body p {
-    margin: 0;
-    color: #334155;
-    font-size: 8pt;
-    line-height: 1.35;
-  }
-
-  .print-product-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2mm;
-  }
-
-  .print-product-body ul {
-    display: grid;
-    gap: 1mm;
-    margin: 0;
-    padding-left: 4mm;
-    color: #334155;
-    font-size: 7.8pt;
-    line-height: 1.25;
   }
 
   .print-price-row {
