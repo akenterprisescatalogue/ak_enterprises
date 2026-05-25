@@ -6,6 +6,7 @@ import { useState } from "react";
 import { LogIn, LogOut, Plus, ShieldCheck, UserRound } from "lucide-react";
 
 import { useAuth } from "@/components/AuthProvider";
+import { CatalogPrintDialog } from "@/components/CatalogPrintDialog";
 import type { UserRole } from "@/lib/types";
 
 const roleLabels: Record<UserRole, string> = {
@@ -66,17 +67,20 @@ export function AppHeader() {
           </Link>
         ) : null}
 
-        {user || (!isConfigured && role !== "public") ? (
-          <button className="button button-logout" type="button" onClick={() => void handleSignOut()} disabled={signingOut}>
-            <LogOut size={19} aria-hidden="true" />
-            <span>{signingOut ? "Logging out" : "Logout"}</span>
-          </button>
-        ) : (
-          <Link href="/login" className="button button-login" aria-label="Login">
-            <LogIn size={19} aria-hidden="true" />
-            <span>Login</span>
-          </Link>
-        )}
+        <div className="header-print-stack">
+          {user || (!isConfigured && role !== "public") ? (
+            <button className="button button-logout" type="button" onClick={() => void handleSignOut()} disabled={signingOut}>
+              <LogOut size={19} aria-hidden="true" />
+              <span>{signingOut ? "Logging out" : "Logout"}</span>
+            </button>
+          ) : (
+            <Link href="/login" className="button button-login" aria-label="Login">
+              <LogIn size={19} aria-hidden="true" />
+              <span>Login</span>
+            </Link>
+          )}
+          <CatalogPrintDialog />
+        </div>
       </div>
     </header>
   );

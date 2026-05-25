@@ -51,6 +51,10 @@ const emptyForm: ProductFormState = {
 
 const availabilityOptions: Availability[] = ["In Stock", "Limited", "On Order", "Unavailable"];
 
+function isDuplicateError(error: { code?: string; message?: string } | null) {
+  return error?.code === "23505" || error?.message?.toLowerCase().includes("duplicate key");
+}
+
 export function AdminListingManager() {
   const searchParams = useSearchParams();
   const { accessToken } = useAuth();
@@ -136,94 +140,270 @@ export function AdminListingManager() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, editId]);
 
+  async function findCategoryBySlug(slug: string) {
+    if (!supabase) return null;
+    const { data: existing } = await supabase.from("main_categories").select("id").eq("slug", slug).maybeSingle();
+    return existing;
+  }
+
+  async function findBrandBySlug(mainCategoryId: string, slug: string) {
+    if (!supabase) return null;
+    const { data: existing } = await supabase
+      .from("brands")
+      .select("id")
+      .eq("main_category_id", mainCategoryId)
+      .eq("slug", slug)
+      .maybeSingle();
+    return existing;
+  }
+
+  async function findSubcategoryBySlug(brandId: string, slug: string) {
+    if (!supabase) return null;
+    const { data: existing } = await supabase
+      .from("subcategories")
+      .select("id")
+      .eq("brand_id", brandId)
+      .eq("slug", slug)
+      .maybeSingle();
+    return existing;
+  }
+
+  async function findSecondSubcategoryBySlug(subcategoryId: string, slug: string) {
+    if (!supabase) return null;
+    const { data: existing } = await supabase
+      .from("second_subcategories")
+      .select("id")
+      .eq("subcategory_id", subcategoryId)
+      .eq("slug", slug)
+      .maybeSingle();
+    return existing;
+  }
+
   async function createCategory() {
     if (!supabase || !data || !newCategoryName.trim()) return;
 
+    const name = newCategoryName.trim();
+    const slug = createSlug(name);
+    if (!slug) {
+      setFormError("Enter a valid main category name.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
+    setMessage(null);
+
+    const localExisting = data.categories.find((category) => category.slug === slug);
+    if (localExisting) {
+      setSelectedCategoryId(localExisting.id);
+      setSelectedBrandId("");
+      setSelectedSubcategoryId("");
+      setSelectedSecondSubcategoryId("");
+      setNewCategoryName("");
+      setMessage("Main category already exists and is now selected.");
+      setSaving(false);
+      return;
+    }
+
     const { data: inserted, error: createError } = await supabase
       .from("main_categories")
       .insert({
-        name: newCategoryName.trim(),
-        slug: createSlug(newCategoryName),
+        name,
+        slug,
         sort_order: data.categories.length + 1
       })
       .select("id")
       .single();
 
-    setSaving(false);
     if (createError) {
+      if (isDuplicateError(createError)) {
+        const existing = await findCategoryBySlug(slug);
+        if (existing?.id) {
+          setSelectedCategoryId(existing.id);
+          setSelectedBrandId("");
+          setSelectedSubcategoryId("");
+          setSelectedSecondSubcategoryId("");
+          setNewCategoryName("");
+          setMessage("Main category already exists and is now selected.");
+          setSaving(false);
+          await refresh();
+          return;
+        }
+      }
+
       setFormError(createError.message);
+      setSaving(false);
       return;
     }
 
     setSelectedCategoryId(inserted.id);
+    setSelectedBrandId("");
+    setSelectedSubcategoryId("");
+    setSelectedSecondSubcategoryId("");
     setNewCategoryName("");
+    setMessage("Main category saved and selected.");
+    setSaving(false);
     await refresh();
   }
 
   async function createBrand() {
     if (!supabase || !data || !selectedCategoryId || !newBrandName.trim()) return;
 
+    const name = newBrandName.trim();
+    const slug = createSlug(name);
+    if (!slug) {
+      setFormError("Enter a valid brand name.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
+    setMessage(null);
+
+    const localExisting = data.brands.find(
+      (brand) => brand.main_category_id === selectedCategoryId && brand.slug === slug
+    );
+    if (localExisting) {
+      setSelectedBrandId(localExisting.id);
+      setSelectedSubcategoryId("");
+      setSelectedSecondSubcategoryId("");
+      setNewBrandName("");
+      setMessage("Brand already exists and is now selected.");
+      setSaving(false);
+      return;
+    }
+
     const existingCount = data.brands.filter((brand) => brand.main_category_id === selectedCategoryId).length;
     const { data: inserted, error: createError } = await supabase
       .from("brands")
       .insert({
         main_category_id: selectedCategoryId,
-        name: newBrandName.trim(),
-        slug: createSlug(newBrandName),
+        name,
+        slug,
         sort_order: existingCount + 1
       })
       .select("id")
       .single();
 
-    setSaving(false);
     if (createError) {
+      if (isDuplicateError(createError)) {
+        const existing = await findBrandBySlug(selectedCategoryId, slug);
+        if (existing?.id) {
+          setSelectedBrandId(existing.id);
+          setSelectedSubcategoryId("");
+          setSelectedSecondSubcategoryId("");
+          setNewBrandName("");
+          setMessage("Brand already exists and is now selected.");
+          setSaving(false);
+          await refresh();
+          return;
+        }
+      }
+
       setFormError(createError.message);
+      setSaving(false);
       return;
     }
 
     setSelectedBrandId(inserted.id);
+    setSelectedSubcategoryId("");
+    setSelectedSecondSubcategoryId("");
     setNewBrandName("");
+    setMessage("Brand saved and selected.");
+    setSaving(false);
     await refresh();
   }
 
   async function createSubcategory() {
     if (!supabase || !data || !selectedBrandId || !newSubcategoryName.trim()) return;
 
+    const name = newSubcategoryName.trim();
+    const slug = createSlug(name);
+    if (!slug) {
+      setFormError("Enter a valid subcategory name.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
+    setMessage(null);
+
+    const localExisting = data.subcategories.find(
+      (subcategory) => subcategory.brand_id === selectedBrandId && subcategory.slug === slug
+    );
+    if (localExisting) {
+      setSelectedSubcategoryId(localExisting.id);
+      setSelectedSecondSubcategoryId("");
+      setNewSubcategoryName("");
+      setMessage("Subcategory already exists and is now selected.");
+      setSaving(false);
+      return;
+    }
+
     const existingCount = data.subcategories.filter((subcategory) => subcategory.brand_id === selectedBrandId).length;
     const { data: inserted, error: createError } = await supabase
       .from("subcategories")
       .insert({
         brand_id: selectedBrandId,
-        name: newSubcategoryName.trim(),
-        slug: createSlug(newSubcategoryName),
+        name,
+        slug,
         sort_order: existingCount + 1
       })
       .select("id")
       .single();
 
-    setSaving(false);
     if (createError) {
+      if (isDuplicateError(createError)) {
+        const existing = await findSubcategoryBySlug(selectedBrandId, slug);
+        if (existing?.id) {
+          setSelectedSubcategoryId(existing.id);
+          setSelectedSecondSubcategoryId("");
+          setNewSubcategoryName("");
+          setMessage("Subcategory already exists and is now selected.");
+          setSaving(false);
+          await refresh();
+          return;
+        }
+      }
+
       setFormError(createError.message);
+      setSaving(false);
       return;
     }
 
     setSelectedSubcategoryId(inserted.id);
     setSelectedSecondSubcategoryId("");
     setNewSubcategoryName("");
+    setMessage("Subcategory saved and selected.");
+    setSaving(false);
     await refresh();
   }
 
   async function createSecondSubcategory() {
     if (!supabase || !data || !selectedSubcategoryId || !newSecondSubcategoryName.trim()) return;
 
+    const name = newSecondSubcategoryName.trim();
+    const slug = createSlug(name);
+    if (!slug) {
+      setFormError("Enter a valid second subcategory name.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
+    setMessage(null);
+
+    const localExisting = data.secondSubcategories.find(
+      (subcategory) => subcategory.subcategory_id === selectedSubcategoryId && subcategory.slug === slug
+    );
+    if (localExisting) {
+      setSelectedSecondSubcategoryId(localExisting.id);
+      setNewSecondSubcategoryName("");
+      setMessage("Second subcategory already exists and is now selected.");
+      setSaving(false);
+      return;
+    }
+
     const existingCount = data.secondSubcategories.filter(
       (subcategory) => subcategory.subcategory_id === selectedSubcategoryId
     ).length;
@@ -231,21 +411,35 @@ export function AdminListingManager() {
       .from("second_subcategories")
       .insert({
         subcategory_id: selectedSubcategoryId,
-        name: newSecondSubcategoryName.trim(),
-        slug: createSlug(newSecondSubcategoryName),
+        name,
+        slug,
         sort_order: existingCount + 1
       })
       .select("id")
       .single();
 
-    setSaving(false);
     if (createError) {
+      if (isDuplicateError(createError)) {
+        const existing = await findSecondSubcategoryBySlug(selectedSubcategoryId, slug);
+        if (existing?.id) {
+          setSelectedSecondSubcategoryId(existing.id);
+          setNewSecondSubcategoryName("");
+          setMessage("Second subcategory already exists and is now selected.");
+          setSaving(false);
+          await refresh();
+          return;
+        }
+      }
+
       setFormError(createError.message);
+      setSaving(false);
       return;
     }
 
     setSelectedSecondSubcategoryId(inserted.id);
     setNewSecondSubcategoryName("");
+    setMessage("Second subcategory saved and selected.");
+    setSaving(false);
     await refresh();
   }
 
@@ -392,6 +586,8 @@ export function AdminListingManager() {
         </div>
 
         {data.schemaWarning ? <p className="form-error">{data.schemaWarning}</p> : null}
+        {formError ? <p className="form-error">{formError}</p> : null}
+        {message ? <p className="form-success">{message}</p> : null}
 
         <div className="hierarchy-grid">
           <div className="field-stack">

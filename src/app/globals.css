@@ -140,6 +140,12 @@ select:disabled {
   gap: 8px;
 }
 
+.header-print-stack {
+  display: grid;
+  gap: 7px;
+  justify-items: stretch;
+}
+
 .button,
 .icon-button {
   display: inline-flex;
@@ -180,6 +186,12 @@ select:disabled {
   box-shadow: 0 8px 20px rgba(16, 32, 51, 0.06);
 }
 
+.button-print {
+  color: var(--blue);
+  background: var(--blue-3);
+  border-color: rgba(11, 74, 134, 0.18);
+}
+
 .button-logout {
   color: #9e1625;
   background: #fff5f6;
@@ -190,6 +202,12 @@ select:disabled {
   color: var(--blue);
   background: var(--blue-3);
   border-color: rgba(11, 74, 134, 0.18);
+}
+
+.button-cancel {
+  color: var(--ink);
+  background: #ffffff;
+  border-color: var(--line);
 }
 
 .icon-button {
@@ -306,7 +324,7 @@ select:disabled {
   display: grid;
   grid-template-columns: 294px minmax(0, 1fr);
   gap: 18px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .sidebar-nav {
@@ -1255,6 +1273,134 @@ select:disabled {
   min-height: 320px;
 }
 
+.print-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(7, 21, 35, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.print-modal {
+  display: grid;
+  width: min(820px, 100%);
+  max-height: min(760px, calc(100vh - 36px));
+  gap: 16px;
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid rgba(219, 231, 244, 0.96);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.96)),
+    #ffffff;
+  box-shadow: 0 28px 70px rgba(7, 21, 35, 0.24);
+}
+
+.print-modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.print-modal-heading h2 {
+  margin: 3px 0 0;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.05;
+}
+
+.print-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.print-scope-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--ink);
+  font-weight: 800;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.print-scope-button.active {
+  color: var(--blue);
+  border-color: rgba(11, 74, 134, 0.28);
+  background: var(--blue-3);
+}
+
+.print-selector-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 0.38fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.print-selector-panel label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 820;
+}
+
+.print-selector-panel select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.print-summary-card {
+  display: grid;
+  gap: 3px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(11, 74, 134, 0.14);
+  border-radius: 8px;
+  background: rgba(232, 243, 255, 0.72);
+}
+
+.print-summary-card span,
+.print-summary-card em {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.print-summary-card strong {
+  color: var(--blue);
+  font-size: 1.28rem;
+  line-height: 1;
+}
+
+.print-modal-actions {
+  position: sticky;
+  bottom: -18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 10px;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0), rgba(248, 251, 255, 0.98) 34%);
+}
+
+.print-root {
+  display: none;
+}
+
 @media (max-width: 1040px) {
   .catalog-layout {
     grid-template-columns: 250px minmax(0, 1fr);
@@ -1317,6 +1463,11 @@ select:disabled {
     flex-wrap: wrap;
   }
 
+  .header-print-stack {
+    grid-template-columns: 1fr;
+    min-width: 132px;
+  }
+
   .catalog-hero {
     grid-template-columns: 1fr;
     padding: 20px;
@@ -1356,10 +1507,22 @@ select:disabled {
   .form-grid,
   .form-grid-textareas,
   .media-upload-grid,
+  .print-scope-grid,
+  .print-selector-panel,
   .hierarchy-grid,
   .salesman-form,
   .demo-login-actions {
     grid-template-columns: 1fr;
+  }
+
+  .print-modal-actions {
+    bottom: -18px;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .print-modal-actions .button {
+    width: 100%;
   }
 
   .listing-row {
@@ -1439,5 +1602,255 @@ select:disabled {
 
   .login-logo-frame img {
     height: 138px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body.is-printing-catalog {
+    background: #ffffff !important;
+  }
+
+  body.is-printing-catalog * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    visibility: hidden !important;
+  }
+
+  body.is-printing-catalog .print-root,
+  body.is-printing-catalog .print-root * {
+    visibility: visible !important;
+  }
+
+  body.is-printing-catalog .print-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block !important;
+    width: 100%;
+    color: #102033;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .print-cover {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding-bottom: 10mm;
+    border-bottom: 2px solid #0b4a86;
+  }
+
+  .print-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .print-brand img {
+    width: 42mm;
+    height: 22mm;
+    object-fit: contain;
+  }
+
+  .print-brand div {
+    display: grid;
+    gap: 1mm;
+  }
+
+  .print-brand strong {
+    color: #0b4a86;
+    font-size: 18pt;
+    line-height: 1;
+  }
+
+  .print-brand span,
+  .print-cover-meta span,
+  .print-title-block span,
+  .print-title-block p,
+  .print-product-path,
+  .print-product-meta,
+  .print-price-row small {
+    color: #637083;
+  }
+
+  .print-cover-meta {
+    display: grid;
+    gap: 2mm;
+    text-align: right;
+  }
+
+  .print-cover-meta strong {
+    color: #0b4a86;
+    font-size: 12pt;
+  }
+
+  .print-title-block {
+    display: grid;
+    gap: 2mm;
+    margin: 8mm 0;
+    break-after: avoid;
+  }
+
+  .print-title-block span,
+  .print-title-block p {
+    margin: 0;
+    font-size: 9pt;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .print-title-block h1 {
+    margin: 0;
+    color: #102033;
+    font-size: 22pt;
+    line-height: 1.08;
+  }
+
+  .print-category,
+  .print-brand-section,
+  .print-subcategory,
+  .print-second-subcategory {
+    display: grid;
+    gap: 4mm;
+  }
+
+  .print-category {
+    margin-top: 7mm;
+  }
+
+  .print-category h2,
+  .print-brand-section h3,
+  .print-subcategory h4,
+  .print-second-subcategory h5 {
+    margin: 0;
+    break-after: avoid;
+  }
+
+  .print-category h2 {
+    padding: 3mm 4mm;
+    color: #ffffff;
+    font-size: 15pt;
+    background: #0b4a86;
+  }
+
+  .print-brand-section h3 {
+    padding: 2mm 0 1mm;
+    color: #0b4a86;
+    font-size: 13pt;
+    border-bottom: 1px solid #dbe7f4;
+  }
+
+  .print-subcategory h4 {
+    color: #102033;
+    font-size: 11pt;
+  }
+
+  .print-second-subcategory h5 {
+    padding-left: 3mm;
+    color: #637083;
+    font-size: 9.5pt;
+    border-left: 2px solid #0b4a86;
+  }
+
+  .print-product-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
+  }
+
+  .print-product-card {
+    display: grid;
+    grid-template-columns: 31mm minmax(0, 1fr);
+    gap: 3mm;
+    min-height: 42mm;
+    padding: 3mm;
+    border: 1px solid #dbe7f4;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-product-media {
+    display: grid;
+    width: 31mm;
+    height: 31mm;
+    place-items: center;
+    overflow: hidden;
+    color: #637083;
+    font-size: 8pt;
+    background: #eef6ff;
+    border: 1px solid #dbe7f4;
+  }
+
+  .print-product-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .print-product-body {
+    display: grid;
+    gap: 1.8mm;
+    min-width: 0;
+  }
+
+  .print-product-path,
+  .print-product-meta,
+  .print-price-row small {
+    font-size: 7.5pt;
+    font-weight: 800;
+  }
+
+  .print-product-body h6 {
+    margin: 0;
+    color: #102033;
+    font-size: 10.5pt;
+    line-height: 1.2;
+  }
+
+  .print-product-body p {
+    margin: 0;
+    color: #334155;
+    font-size: 8pt;
+    line-height: 1.35;
+  }
+
+  .print-product-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2mm;
+  }
+
+  .print-product-body ul {
+    display: grid;
+    gap: 1mm;
+    margin: 0;
+    padding-left: 4mm;
+    color: #334155;
+    font-size: 7.8pt;
+    line-height: 1.25;
+  }
+
+  .print-price-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3mm;
+    margin-top: 1mm;
+  }
+
+  .print-price-row span {
+    display: grid;
+    gap: 0.5mm;
+    min-width: 20mm;
+  }
+
+  .print-price-row strong {
+    color: #0b4a86;
+    font-size: 10pt;
   }
 }
