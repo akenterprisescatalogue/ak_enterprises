@@ -843,6 +843,19 @@ select:disabled {
     linear-gradient(135deg, #eef6ff, #ffffff);
 }
 
+.detail-media-stage.is-zoomable {
+  cursor: zoom-in;
+  touch-action: none;
+}
+
+.detail-media-stage.is-zoomed {
+  cursor: grab;
+}
+
+.detail-media-stage.is-zoomed:active {
+  cursor: grabbing;
+}
+
 .detail-media-stage img,
 .detail-media-stage video,
 .detail-media-stage iframe {
@@ -856,6 +869,8 @@ select:disabled {
   object-fit: contain;
   transform-origin: center;
   transition: transform 180ms ease;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .detail-media-stage video,

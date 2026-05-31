@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -28,6 +37,62 @@ type MediaItem = {
   url: string;
 };
 
+type Point = {
+  x: number;
+  y: number;
+};
+
+type PointerDragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startPan: Point;
+};
+
+type TouchGestureState = {
+  mode: "swipe" | "pan" | "pinch";
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  startPan: Point;
+  startZoom: number;
+  startDistance: number;
+  didPinch: boolean;
+};
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.25;
+const SWIPE_DISTANCE = 46;
+const SWIPE_RESTRAINT = 62;
+const DEFAULT_ORIGIN = { x: 50, y: 50 };
+const DEFAULT_PAN = { x: 0, y: 0 };
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function roundZoom(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function getTouchDistance(touches: ReactTouchEvent<HTMLDivElement>["touches"]) {
+  if (touches.length < 2) return 0;
+  const first = touches[0];
+  const second = touches[1];
+  return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+}
+
+function getTouchMidpoint(touches: ReactTouchEvent<HTMLDivElement>["touches"]) {
+  const first = touches[0];
+  const second = touches[1];
+  return {
+    clientX: (first.clientX + second.clientX) / 2,
+    clientY: (first.clientY + second.clientY) / 2,
+  };
+}
+
 function getVideoEmbedUrl(url: string) {
   try {
     const parsed = new URL(url);
@@ -51,9 +116,14 @@ function isVideoFile(url: string) {
 export function ProductDetailView({ product }: { product: ProductWithRelations }) {
   const { role } = useAuth();
   const canEdit = role === "admin";
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const pointerDragRef = useRef<PointerDragState | null>(null);
+  const touchGestureRef = useRef<TouchGestureState | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("images");
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [zoomOrigin, setZoomOrigin] = useState<Point>(DEFAULT_ORIGIN);
+  const [pan, setPan] = useState<Point>(DEFAULT_PAN);
 
   const mediaItems = useMemo<MediaItem[]>(
     () => [
@@ -65,15 +135,24 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
 
   const activeMedia = mediaItems[activeMediaIndex];
   const canZoom = activeMedia?.type === "image";
+  const isZoomed = canZoom && zoom > MIN_ZOOM;
+  const imageTransformStyle: CSSProperties = {
+    transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+    transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+  };
 
   useEffect(() => {
     setActiveTab("images");
     setActiveMediaIndex(0);
     setZoom(1);
+    setZoomOrigin(DEFAULT_ORIGIN);
+    setPan(DEFAULT_PAN);
   }, [product.id]);
 
   useEffect(() => {
     setZoom(1);
+    setZoomOrigin(DEFAULT_ORIGIN);
+    setPan(DEFAULT_PAN);
   }, [activeMediaIndex]);
 
   useEffect(() => {
@@ -81,6 +160,47 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
       setActiveMediaIndex(0);
     }
   }, [activeMediaIndex, mediaItems.length]);
+
+  const getStageOrigin = (clientX: number, clientY: number): Point => {
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (!rect) return DEFAULT_ORIGIN;
+
+    return {
+      x: clamp(((clientX - rect.left) / rect.width) * 100, 0, 100),
+      y: clamp(((clientY - rect.top) / rect.height) * 100, 0, 100),
+    };
+  };
+
+  const clampPan = (nextPan: Point, nextZoom = zoom) => {
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (!rect || nextZoom <= MIN_ZOOM) return DEFAULT_PAN;
+
+    const maxX = (rect.width * (nextZoom - MIN_ZOOM)) / 2;
+    const maxY = (rect.height * (nextZoom - MIN_ZOOM)) / 2;
+
+    return {
+      x: clamp(nextPan.x, -maxX, maxX),
+      y: clamp(nextPan.y, -maxY, maxY),
+    };
+  };
+
+  const applyZoom = (nextZoom: number, origin?: Point) => {
+    if (!canZoom) return;
+    const safeZoom = clamp(roundZoom(nextZoom), MIN_ZOOM, MAX_ZOOM);
+
+    if (origin) {
+      setZoomOrigin(origin);
+    }
+
+    setZoom(safeZoom);
+    setPan((current) => clampPan(current, safeZoom));
+  };
+
+  const resetZoom = () => {
+    setZoom(MIN_ZOOM);
+    setZoomOrigin(DEFAULT_ORIGIN);
+    setPan(DEFAULT_PAN);
+  };
 
   const goToPreviousMedia = () => {
     if (mediaItems.length < 2) return;
@@ -92,8 +212,197 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
     setActiveMediaIndex((current) => (current + 1) % mediaItems.length);
   };
 
-  const zoomOut = () => setZoom((current) => Math.max(1, Number((current - 0.25).toFixed(2))));
-  const zoomIn = () => setZoom((current) => Math.min(2.5, Number((current + 0.25).toFixed(2))));
+  const zoomOut = () => applyZoom(zoom - ZOOM_STEP);
+  const zoomIn = () => applyZoom(zoom + ZOOM_STEP);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!canZoom || event.pointerType === "touch") return;
+
+    setZoomOrigin(getStageOrigin(event.clientX, event.clientY));
+    if (!isZoomed) return;
+
+    pointerDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPan: pan,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !isZoomed) return;
+
+    event.preventDefault();
+    setPan(
+      clampPan({
+        x: drag.startPan.x + event.clientX - drag.startX,
+        y: drag.startPan.y + event.clientY - drag.startY,
+      }),
+    );
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (pointerDragRef.current?.pointerId === event.pointerId) {
+      pointerDragRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+  };
+
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!canZoom) return;
+
+    const origin = getStageOrigin(event.clientX, event.clientY);
+    if (isZoomed) {
+      resetZoom();
+    } else {
+      applyZoom(2, origin);
+    }
+  };
+
+  const handleTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!canZoom) return;
+
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const midpoint = getTouchMidpoint(event.touches);
+      setZoomOrigin(getStageOrigin(midpoint.clientX, midpoint.clientY));
+      touchGestureRef.current = {
+        mode: "pinch",
+        startX: midpoint.clientX,
+        startY: midpoint.clientY,
+        currentX: midpoint.clientX,
+        currentY: midpoint.clientY,
+        startPan: pan,
+        startZoom: zoom,
+        startDistance: getTouchDistance(event.touches),
+        didPinch: true,
+      };
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    setZoomOrigin(getStageOrigin(touch.clientX, touch.clientY));
+    touchGestureRef.current = {
+      mode: isZoomed ? "pan" : "swipe",
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      currentY: touch.clientY,
+      startPan: pan,
+      startZoom: zoom,
+      startDistance: 0,
+      didPinch: false,
+    };
+  };
+
+  const handleTouchMove = (event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!canZoom) return;
+
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const midpoint = getTouchMidpoint(event.touches);
+      const currentDistance = getTouchDistance(event.touches);
+      const gesture = touchGestureRef.current;
+      const startDistance = gesture?.startDistance || currentDistance;
+      const startZoom = gesture?.startZoom || zoom;
+      const nextZoom = startDistance > 0 ? clamp(roundZoom(startZoom * (currentDistance / startDistance)), MIN_ZOOM, MAX_ZOOM) : zoom;
+
+      setZoomOrigin(getStageOrigin(midpoint.clientX, midpoint.clientY));
+      setZoom(nextZoom);
+      setPan((current) => clampPan(current, nextZoom));
+      touchGestureRef.current = {
+        mode: "pinch",
+        startX: gesture?.startX ?? midpoint.clientX,
+        startY: gesture?.startY ?? midpoint.clientY,
+        currentX: midpoint.clientX,
+        currentY: midpoint.clientY,
+        startPan: gesture?.startPan ?? pan,
+        startZoom,
+        startDistance,
+        didPinch: true,
+      };
+      return;
+    }
+
+    const touch = event.touches[0];
+    const gesture = touchGestureRef.current;
+    if (!touch || !gesture) return;
+
+    const deltaX = touch.clientX - gesture.startX;
+    const deltaY = touch.clientY - gesture.startY;
+
+    if (gesture.mode === "pan" || zoom > MIN_ZOOM) {
+      event.preventDefault();
+      setPan(
+        clampPan({
+          x: gesture.startPan.x + deltaX,
+          y: gesture.startPan.y + deltaY,
+        }),
+      );
+    } else if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      event.preventDefault();
+    }
+
+    touchGestureRef.current = {
+      ...gesture,
+      currentX: touch.clientX,
+      currentY: touch.clientY,
+    };
+  };
+
+  const handleTouchEnd = (event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!canZoom) return;
+
+    const gesture = touchGestureRef.current;
+    if (!gesture) return;
+
+    if (event.touches.length > 0) {
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        touchGestureRef.current = {
+          mode: zoom > MIN_ZOOM ? "pan" : "swipe",
+          startX: touch.clientX,
+          startY: touch.clientY,
+          currentX: touch.clientX,
+          currentY: touch.clientY,
+          startPan: pan,
+          startZoom: zoom,
+          startDistance: 0,
+          didPinch: gesture.didPinch,
+        };
+      }
+      return;
+    }
+
+    touchGestureRef.current = null;
+
+    if (gesture.didPinch) {
+      return;
+    }
+
+    const deltaX = gesture.currentX - gesture.startX;
+    const deltaY = gesture.currentY - gesture.startY;
+    const changedTouch = event.changedTouches[0];
+
+    if (changedTouch && Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) {
+      setZoomOrigin(getStageOrigin(changedTouch.clientX, changedTouch.clientY));
+      return;
+    }
+
+    if (zoom <= MIN_ZOOM && mediaItems.length > 1 && Math.abs(deltaX) > SWIPE_DISTANCE && Math.abs(deltaY) < SWIPE_RESTRAINT) {
+      if (deltaX < 0) {
+        goToNextMedia();
+      } else {
+        goToPreviousMedia();
+      }
+    }
+  };
 
   return (
     <main className="app-shell product-detail-shell">
@@ -177,7 +486,7 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
                 type="button"
                 className="icon-button"
                 onClick={zoomIn}
-                disabled={!canZoom || zoom >= 2.5}
+                disabled={!canZoom || zoom >= MAX_ZOOM}
                 aria-label="Zoom in"
               >
                 <ZoomIn size={18} aria-hidden="true" />
@@ -185,7 +494,7 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
               <button
                 type="button"
                 className="icon-button"
-                onClick={() => setZoom(1)}
+                onClick={resetZoom}
                 disabled={!canZoom || zoom === 1}
                 aria-label="Reset zoom"
               >
@@ -194,13 +503,26 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
             </div>
           </div>
 
-          <div className="detail-media-stage">
+          <div
+            ref={stageRef}
+            className={`detail-media-stage ${canZoom ? "is-zoomable" : ""} ${isZoomed ? "is-zoomed" : ""}`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onDoubleClick={handleDoubleClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+          >
             {activeMedia ? (
               activeMedia.type === "image" ? (
                 <img
                   src={activeMedia.url}
                   alt={`${product.name} image ${activeMediaIndex + 1}`}
-                  style={{ transform: `scale(${zoom})` }}
+                  draggable={false}
+                  style={imageTransformStyle}
                 />
               ) : isVideoFile(activeMedia.url) ? (
                 <video src={activeMedia.url} controls />
