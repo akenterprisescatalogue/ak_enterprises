@@ -800,7 +800,7 @@ select:disabled {
   display: grid;
   gap: 16px;
   padding: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .detail-media-toolbar {
@@ -845,11 +845,12 @@ select:disabled {
 
 .detail-media-stage.is-zoomable {
   cursor: zoom-in;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .detail-media-stage.is-zoomed {
   cursor: grab;
+  touch-action: none;
 }
 
 .detail-media-stage.is-zoomed:active {
@@ -1696,7 +1697,17 @@ select:disabled {
   }
 
   .detail-media-thumbs {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .detail-media-thumb {
+    flex: 0 0 86px;
+    scroll-snap-align: start;
   }
 
   .print-modal-backdrop {
@@ -1847,10 +1858,11 @@ select:disabled {
   }
 
   .detail-media-thumbs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: none;
   }
 
   .detail-media-thumb {
+    flex-basis: 78px;
     min-height: 74px;
   }
 
