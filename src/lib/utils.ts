@@ -48,6 +48,42 @@ export function filterProducts(
   });
 }
 
+export function searchProducts(products: ProductWithRelations[], query: string) {
+  const terms = query
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (terms.length === 0) return products;
+
+  return products.filter((product) => {
+    const searchableText = [
+      product.name,
+      product.slug,
+      product.sku,
+      product.description,
+      product.pack_size,
+      product.availability,
+      product.main_category?.name,
+      product.main_category?.description,
+      product.brand?.name,
+      product.brand?.description,
+      product.subcategory?.name,
+      product.subcategory?.description,
+      product.second_subcategory?.name,
+      product.second_subcategory?.description,
+      ...product.highlights,
+      ...product.tags
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return terms.every((term) => searchableText.includes(term));
+  });
+}
+
 export function getSelectionTitle(data: CatalogData, selected: FilterSelection) {
   if (selected.type === "all") return "All Products";
   if (selected.type === "main") {

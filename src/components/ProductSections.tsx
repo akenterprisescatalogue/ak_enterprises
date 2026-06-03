@@ -8,10 +8,12 @@ import { buildGroupedProducts } from "@/lib/utils";
 
 export function ProductSections({
   data,
-  products
+  products,
+  emptyDescription = "Try another category, brand, or subcategory from the directory."
 }: {
   data: CatalogData;
   products: ProductWithRelations[];
+  emptyDescription?: string;
 }) {
   const groups = buildGroupedProducts(data, products);
 
@@ -20,7 +22,7 @@ export function ProductSections({
       <div className="empty-state">
         <SearchX size={26} aria-hidden="true" />
         <h3>No products found</h3>
-        <p>Try another category, brand, or subcategory from the directory.</p>
+        <p>{emptyDescription}</p>
       </div>
     );
   }
