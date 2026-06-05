@@ -29,7 +29,7 @@ set
 with target_user as (
   select id, email
   from auth.users
-  where lower(email) = lower('bashir147020@gmail.com')
+  where lower(email) = lower('muhammadalihasnain23@gmail.com')
 )
 insert into public.profiles (id, email, full_name, role)
 select

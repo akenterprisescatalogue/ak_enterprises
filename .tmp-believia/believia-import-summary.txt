@@ -1,0 +1,71 @@
+Believia import manifest
+Generated: 2026-06-04T19:13:42.372Z
+Image root: C:\Users\ANC\Downloads\Compressed\Believia
+
+Total products: 62
+Priced products: 39
+Products with images: 28
+Missing prices: 23
+Missing images: 34
+Unmatched image files: 0
+
+Missing price products:
+- Believa BP30W Machine
+- Believia BP20FK Family Kit
+- Believia Digital BP50A Machine
+- Believia Mercurial BP15M Machine
+- Believia Deluxe DST05 (HS-30N) Steth
+- Believia ST01 (HS-30B) Steth
+- Believia ST05 Steth
+- Believia DT20 Digital Thermometer
+- Believia infrared Forehead  IF 02T (DET-3012) Gun
+- Believia 30G Twis Sterile Lancets 100ct
+- Believia Lancing Device Pen
+- Believia Alchohal Prep Pads
+- Believia Nebulizer NB04 Machine
+- Believia DWS-005 Digital weight Scale
+- Believia MB-3021 Digital weight Scale
+- Believia MB3031 Electronic Mother and baby Weight Scale
+- Believia HWS-001 Height And Weight Scale
+- Believia Air Mattress AM01 Machine
+- Believia Air Mattress AM01 Machine
+- Believia Air Mattress AM02 Machine
+- Believia Oxygen Concentrator 5L Machine
+- Believia Oxygen Concentrator OXC-10 Machine
+- Belivia Electric EWC-01 Wheel Chair
+
+Missing image products:
+- Believa BP30W Machine
+- Believia BP20FK Family Kit
+- Believia BP40W Machine
+- Believia Mercurial BP15M Machine
+- Believia Deluxe DST05 (HS-30N) Steth
+- Believia Deluxe DST05 (HS-30N) Steth Black
+- Believia Deluxe DST05 (HS-30N) Steth Blue
+- Believia Deluxe DST05 (HS-30N) Steth Burgundy
+- Believia Dual Head BCS-06 (HS-30J) Steth Black
+- Believia Dual Head BCS-06 (HS-30J) Steth Blue
+- Believia ST01 (HS-30B) Steth
+- Believia ST05 Steth
+- Believia Bg-01 Blood Glucose Meter
+- Believia Blood Glucose 50ct Test Strip
+- Believia Blood Glucose Blister pack 50ct Test Strip
+- Believia 30G Flat Sterile Lancets 100ct
+- Believia 30G Twis Sterile Lancets 100ct
+- Believia Flat FBL- Lancets 100ct
+- Believia Flat FBL Lancets 50ct
+- Believia Twist Blood 30G Lancets 100ct
+- Believia Twist TBL Lancets 50ct
+- Believia Lancing Device Pen
+- Believia Alchohal Prep Pads
+- Believia Nebulizer NB03 Machine
+- Believia Nebulizer NB04 Machine
+- Believia DWS-005 Digital weight Scale
+- Believia MB-3021 Digital weight Scale
+- Believia MB3031 Electronic Mother and baby Weight Scale
+- Believia Digital EBS-01 Baby Weight Scale
+- Believia Air Mattress AM01 Machine
+- Believia Air Mattress AM01 Machine
+- Believia Air Mattress AM02 Machine
+- Believia Oxygen Concentrator OXC-10 Machine
+- Belivia Electric EWC-01 Wheel Chair

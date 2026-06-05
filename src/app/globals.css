@@ -1101,6 +1101,24 @@ select:disabled {
   margin-top: 2px;
 }
 
+.product-info-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+  margin: 14px 0 0;
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+.product-info-list li {
+  padding-left: 2px;
+}
+
+.product-info-list li::marker {
+  color: var(--blue);
+  font-size: 1.05em;
+}
+
 .video-section {
   margin-top: 18px;
 }

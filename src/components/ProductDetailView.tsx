@@ -113,6 +113,13 @@ function isVideoFile(url: string) {
   return /\.(mp4|webm|ogg)(?:$|[?#])/i.test(url);
 }
 
+function getDescriptionFeatures(description: string) {
+  return description
+    .split(/\r?\n|(?=•)/)
+    .map((line) => line.trim().replace(/^•\s*/, ""))
+    .filter(Boolean);
+}
+
 export function ProductDetailView({ product }: { product: ProductWithRelations }) {
   const { role } = useAuth();
   const canEdit = role === "admin";
@@ -132,6 +139,7 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
     ],
     [product.image_urls, product.video_urls],
   );
+  const descriptionFeatures = useMemo(() => getDescriptionFeatures(product.description), [product.description]);
 
   const activeMedia = mediaItems[activeMediaIndex];
   const canZoom = activeMedia?.type === "image";
@@ -570,7 +578,6 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
               {product.second_subcategory?.name ? <span>{product.second_subcategory.name}</span> : null}
             </div>
             <h1>{product.name}</h1>
-            <p>{product.description}</p>
 
             <div className="detail-tags">
               {product.sku ? (
@@ -613,7 +620,15 @@ export function ProductDetailView({ product }: { product: ProductWithRelations }
 
             <div className="detail-panel">
               <span className="eyebrow">Product Info</span>
-              <p>{product.description}</p>
+              {descriptionFeatures.length > 0 ? (
+                <ul className="product-info-list">
+                  {descriptionFeatures.map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No product info added yet.</p>
+              )}
               {product.tags.length > 0 ? (
                 <div className="tag-row">
                   {product.tags.map((tag) => (
