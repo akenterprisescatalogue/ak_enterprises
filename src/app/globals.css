@@ -65,8 +65,7 @@ select:disabled {
 }
 
 .app-header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 20;
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(260px, auto) minmax(180px, 1fr);

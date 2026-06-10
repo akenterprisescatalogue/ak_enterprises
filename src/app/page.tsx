@@ -77,7 +77,7 @@ export default function HomePage() {
               <SlidersHorizontal size={18} aria-hidden="true" />
               Browse Directory
             </summary>
-            <SidebarNav data={data} selected={selected} onSelect={setSelected} />
+            <SidebarNav data={data} selected={selected} onSelect={setSelected} collapsibleBrands />
           </details>
 
           <section className="catalog-layout">

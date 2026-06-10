@@ -37,3 +37,6 @@ Thumbs.db
 .vercel
 .turbo
 coverage
+
+# local import manifests / generated bulk-upload outputs
+.tmp-*
