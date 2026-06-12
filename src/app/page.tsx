@@ -81,7 +81,7 @@ export default function HomePage() {
           </details>
 
           <section className="catalog-layout">
-            <SidebarNav data={data} selected={selected} onSelect={setSelected} className="desktop-sidebar" />
+            <SidebarNav data={data} selected={selected} onSelect={setSelected} className="desktop-sidebar" collapsibleBrands />
 
             <div className="catalog-content">
               <div className="content-toolbar">
