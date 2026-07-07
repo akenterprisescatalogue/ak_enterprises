@@ -813,6 +813,8 @@ export function AdminListingManager() {
               <input
                 type="number"
                 min="0"
+                step="0.01"
+                inputMode="decimal"
                 value={form.mrp_price}
                 onChange={(event) => updateForm("mrp_price", event.target.value)}
                 required
@@ -823,6 +825,8 @@ export function AdminListingManager() {
               <input
                 type="number"
                 min="0"
+                step="0.01"
+                inputMode="decimal"
                 value={form.offered_price}
                 onChange={(event) => updateForm("offered_price", event.target.value)}
               />
