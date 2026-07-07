@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Tag,
   Trash2,
   X
@@ -21,7 +22,7 @@ import { ErrorPanel, LoadingPanel } from "@/components/StatusPanels";
 import { useCatalogData } from "@/hooks/useCatalogData";
 import { supabase } from "@/lib/supabase/client";
 import type { Availability, ProductWithRelations } from "@/lib/types";
-import { createSlug, formatCurrency, splitLines, splitTags } from "@/lib/utils";
+import { createSlug, formatCurrency, searchProducts, splitLines, splitTags } from "@/lib/utils";
 
 type ProductFormState = {
   name: string;
@@ -77,6 +78,7 @@ export function AdminListingManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [listingSearch, setListingSearch] = useState("");
 
   const editId = searchParams.get("edit");
 
@@ -94,6 +96,11 @@ export function AdminListingManager() {
     () =>
       data?.secondSubcategories.filter((subcategory) => subcategory.subcategory_id === selectedSubcategoryId) ?? [],
     [data, selectedSubcategoryId]
+  );
+
+  const filteredProducts = useMemo(
+    () => (data ? searchProducts(data.products, listingSearch) : []),
+    [data, listingSearch]
   );
 
   function updateForm<Key extends keyof ProductFormState>(key: Key, value: ProductFormState[Key]) {
@@ -567,7 +574,7 @@ export function AdminListingManager() {
     await refresh();
   }
 
-  if (loading) return <LoadingPanel label="Loading listing manager" />;
+  if (loading && !data) return <LoadingPanel label="Loading listing manager" />;
   if (error) return <ErrorPanel message={error} />;
   if (!data) return null;
 
@@ -922,8 +929,36 @@ export function AdminListingManager() {
           <span className="eyebrow">Listings</span>
           <h2>Manage Products</h2>
         </div>
+
+        <div className="listing-toolbar" role="search" aria-label="Search editable listings">
+          <label className="catalog-search-field listing-search-field">
+            <Search size={18} aria-hidden="true" />
+            <input
+              value={listingSearch}
+              onChange={(event) => setListingSearch(event.target.value)}
+              placeholder="Search products, brands, categories, SKU..."
+              aria-label="Search editable listings"
+            />
+            {listingSearch ? (
+              <button
+                type="button"
+                className="catalog-search-clear"
+                onClick={() => setListingSearch("")}
+                aria-label="Clear listing search"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            ) : null}
+          </label>
+          <span className="listing-search-meta">
+            {listingSearch.trim()
+              ? `${filteredProducts.length} of ${data.products.length} listings`
+              : `${data.products.length} listings`}
+          </span>
+        </div>
+
         <div className="listing-table">
-          {data.products.map((product) => (
+          {filteredProducts.map((product) => (
             <div key={product.id} className="listing-row">
               <div>
                 <strong>{product.name}</strong>
@@ -956,6 +991,13 @@ export function AdminListingManager() {
             <div className="empty-state">
               <Plus size={24} aria-hidden="true" />
               <h3>No listings yet</h3>
+            </div>
+          ) : null}
+
+          {data.products.length > 0 && filteredProducts.length === 0 ? (
+            <div className="empty-state">
+              <Search size={24} aria-hidden="true" />
+              <h3>No matching listings</h3>
             </div>
           ) : null}
         </div>

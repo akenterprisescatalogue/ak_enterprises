@@ -36,6 +36,7 @@ type ServerRoleResult = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const ROLE_CACHE_PREFIX = "ak-role-cache";
 
 async function runWithTimeout<T>(task: () => PromiseLike<T>, message: string, timeoutMs = 12000) {
   let timeoutId: number | undefined;
@@ -58,7 +59,34 @@ function normalizeRole(role: unknown): UserRole {
   return role === "admin" || role === "salesman" ? role : "salesman";
 }
 
-async function loadRole(user: User | null, accessToken?: string | null): Promise<UserRole> {
+function getRoleCacheKey(userId: string) {
+  return `${ROLE_CACHE_PREFIX}:${userId}`;
+}
+
+function readCachedRole(userId: string): UserRole | null {
+  try {
+    const cached = window.localStorage.getItem(getRoleCacheKey(userId));
+    if (!cached) return null;
+    const payload = JSON.parse(cached) as { role?: UserRole };
+    return payload.role === "admin" || payload.role === "salesman" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedRole(userId: string, nextRole: UserRole) {
+  try {
+    window.localStorage.setItem(getRoleCacheKey(userId), JSON.stringify({ role: nextRole, cachedAt: Date.now() }));
+  } catch {
+    // Local storage can be unavailable in private browsing; auth still works without the cache.
+  }
+}
+
+async function loadRole(
+  user: User | null,
+  accessToken?: string | null,
+  fallbackRole: UserRole = "salesman"
+): Promise<UserRole> {
   if (!supabase || !user) return "public";
 
   const client = supabase;
@@ -101,13 +129,13 @@ async function loadRole(user: User | null, accessToken?: string | null): Promise
 
     if (error || !data?.role) {
       console.warn(error?.message ?? "Profile role missing.");
-      return "salesman";
+      return fallbackRole;
     }
 
     return normalizeRole(data.role);
   } catch (error) {
     console.warn(error instanceof Error ? error.message : "Role lookup failed.");
-    return "salesman";
+    return fallbackRole;
   }
 }
 
@@ -148,11 +176,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           8000
         );
         const currentUser = data.session?.user ?? null;
-        const nextRole = await loadRole(currentUser, data.session?.access_token);
+        const sessionAccessToken = data.session?.access_token ?? null;
 
+        if (!currentUser) {
+          if (mounted) {
+            setUser(null);
+            setAccessToken(null);
+            setRole("public");
+          }
+          return;
+        }
+
+        const cachedRole = readCachedRole(currentUser.id);
         if (mounted) {
           setUser(currentUser);
-          setAccessToken(data.session?.access_token ?? null);
+          setAccessToken(sessionAccessToken);
+          if (cachedRole) {
+            setRole(cachedRole);
+            setLoading(false);
+          }
+        }
+
+        const nextRole = await loadRole(currentUser, sessionAccessToken, cachedRole ?? "salesman");
+        writeCachedRole(currentUser.id, nextRole);
+
+        if (mounted) {
           setRole(nextRole);
         }
       } catch (error) {
@@ -171,7 +219,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void boot();
 
-    const subscription = supabase?.auth.onAuthStateChange((_event, session) => {
+    const subscription = supabase?.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+
       const currentUser = session?.user ?? null;
 
       if (!currentUser) {
@@ -184,15 +234,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const sessionAccessToken = session?.access_token ?? null;
+      const cachedRole = readCachedRole(currentUser.id);
+
       if (mounted) {
         setUser(currentUser);
-        setAccessToken(session?.access_token ?? null);
-        setLoading(true);
+        setAccessToken(sessionAccessToken);
+        if (cachedRole) setRole(cachedRole);
+        setLoading(!cachedRole);
       }
 
       window.setTimeout(() => {
         if (!mounted) return;
-        void loadRole(currentUser, session?.access_token).then((nextRole) => {
+        void loadRole(currentUser, sessionAccessToken, cachedRole ?? "salesman").then((nextRole) => {
+          writeCachedRole(currentUser.id, nextRole);
           if (mounted) {
             setRole(nextRole);
             setLoading(false);
@@ -231,6 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!result.data.user) throw new Error("No user was returned from Supabase.");
 
     const nextRole = await loadRole(result.data.user, result.data.session?.access_token);
+    writeCachedRole(result.data.user.id, nextRole);
     setUser(result.data.user);
     setAccessToken(result.data.session?.access_token ?? null);
     setRole(nextRole);

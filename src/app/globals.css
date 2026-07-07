@@ -1488,6 +1488,24 @@ select:disabled {
   gap: 9px;
 }
 
+.listing-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 12px;
+}
+
+.listing-search-field input {
+  min-height: 46px;
+}
+
+.listing-search-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
 .listing-table {
   display: grid;
   gap: 9px;
@@ -1859,6 +1877,16 @@ select:disabled {
 
   .print-modal-actions .button {
     width: 100%;
+  }
+
+  .listing-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .listing-search-meta {
+    justify-self: start;
+    white-space: normal;
   }
 
   .listing-row {

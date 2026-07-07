@@ -60,6 +60,7 @@ function usage() {
   console.log(`Usage:
   node scripts/import-misc-pharma.mjs --prepare
   node scripts/import-misc-pharma.mjs --upload
+  node scripts/import-misc-pharma.mjs --update-details
   node scripts/import-misc-pharma.mjs --verify
 
 Optional:
@@ -312,6 +313,47 @@ function buildProductName(name, strength) {
   return cleanName;
 }
 
+function compactDetailKey(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/®|™/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function buildDetailParts(generic, strength, title = "") {
+  const parts = [];
+  const seenKeys = [compactDetailKey(title)].filter(Boolean);
+
+  for (const rawPart of [generic, strength]) {
+    const part = cleanText(rawPart);
+    const key = compactDetailKey(part);
+    if (!part || !key) continue;
+
+    const alreadyCovered = seenKeys.some((seenKey) => seenKey.includes(key) || key.includes(seenKey));
+    if (alreadyCovered) continue;
+
+    parts.push(part);
+    seenKeys.push(key);
+  }
+
+  return parts;
+}
+
+function buildTitleDetail(generic, strength, title = "") {
+  return buildDetailParts(generic, strength, title).join(" ").trim();
+}
+
+function buildDetailedProductName(name, generic, strength) {
+  const cleanName = cleanProductName(name);
+  const detail = buildTitleDetail(generic, strength, cleanName);
+  return detail ? `${cleanName} ${detail}`.trim() : cleanName;
+}
+
+function withFinalPeriod(value) {
+  const text = cleanText(value);
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
 function inferForm(product) {
   const text = normalize(`${product.name} ${product.generic ?? ""} ${product.strength ?? ""}`);
   if (/\b(injection|inj|iv|ampoule|vial|infusion|syringe)\b/.test(text)) return "Injectable/IV catalog product";
@@ -324,9 +366,9 @@ function inferForm(product) {
 }
 
 function buildFeatures(product) {
-  const packDetail = buildPackSize(product.generic, product.strength);
-  const identity = packDetail
-    ? `Composition/pack detail captured from source catalog: ${packDetail}.`
+  const saltPackDetail = buildTitleDetail(product.generic, product.strength);
+  const identity = saltPackDetail
+    ? `Salt/pack detail: ${withFinalPeriod(saltPackDetail)}`
     : "Product identity captured from the source catalog title.";
 
   return [
@@ -372,9 +414,10 @@ function parseSource(source, sourceIndex) {
       const mrpPrice = prices[entryIndex] ?? (prices.length === 1 ? prices[0] : null);
       const generic = firstAvailable(generics, entryIndex);
       const strength = firstAvailable(strengths, entryIndex);
-      const name = buildProductName(firstAvailable(names, entryIndex), strength);
+      const baseName = buildProductName(firstAvailable(names, entryIndex), strength);
+      const name = buildDetailedProductName(baseName, generic, strength);
 
-      if (!isLikelyProductName(name)) {
+      if (!isLikelyProductName(baseName)) {
         skipped.push({
           brand: source.brand,
           reason: "missing-product-name",
@@ -389,7 +432,7 @@ function parseSource(source, sourceIndex) {
           brand: source.brand,
           reason: "missing-mrp",
           card: cardIndex + 1,
-          name,
+          name: baseName,
         });
         continue;
       }
@@ -401,6 +444,7 @@ function parseSource(source, sourceIndex) {
         brand: source.brand,
         brandSortOrder: source.sortOrder,
         serial: products.length + 1,
+        baseName,
         name,
         generic,
         strength,
@@ -409,7 +453,7 @@ function parseSource(source, sourceIndex) {
         offeredPrice: null,
         imageDataUrls,
         hasImage: imageDataUrls.length > 0,
-        slug: `misc-${source.slug}-${createSlug(name)}-${createSlug(strength || generic)}-${sourceIndex + 1}-${products.length + 1}`,
+        slug: `misc-${source.slug}-${createSlug(baseName)}-${createSlug(strength || generic)}-${sourceIndex + 1}-${products.length + 1}`,
       };
       const features = buildFeatures(product);
       products.push({
@@ -484,6 +528,7 @@ async function writeManifest(manifest) {
     [
       [
         "Brand",
+        "Base Product Name",
         "Product Name",
         "Generic",
         "Strength",
@@ -498,6 +543,7 @@ async function writeManifest(manifest) {
       ...manifest.uploadProducts.map((product) =>
         [
           product.brand,
+          product.baseName,
           product.name,
           product.generic,
           product.strength,
@@ -687,7 +733,7 @@ async function uploadProducts(manifest) {
       slug: product.slug,
       sku: null,
       description: product.description,
-      highlights: [],
+      highlights: product.features,
       image_urls: imageUrls,
       video_urls: [],
       mrp_price: product.mrpPrice,
@@ -709,6 +755,40 @@ async function uploadProducts(manifest) {
   return { uploaded, uploadSummaryPath };
 }
 
+async function updateProductDetails(manifest) {
+  const client = getClient();
+  const updated = [];
+  const missing = [];
+
+  for (const product of manifest.uploadProducts) {
+    const payload = {
+      name: product.name,
+      description: product.description,
+      highlights: product.features,
+      pack_size: product.packSize,
+      tags: ["Miscellaneous Pharma", product.brand, product.generic, product.strength, product.baseName, product.name].filter(Boolean),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await client.from("products").update(payload).eq("slug", product.slug).select("id,name,slug").maybeSingle();
+    if (error) throw new Error(`products update: ${product.slug}: ${error.message}`);
+    if (!data) {
+      missing.push({ slug: product.slug, name: product.name });
+      continue;
+    }
+    updated.push(data);
+  }
+
+  const updateSummaryPath = path.join(OUTPUT_DIR, "misc-pharma-update-details-summary.json");
+  await writeFile(updateSummaryPath, JSON.stringify({ updated, missing }, null, 2));
+
+  if (missing.length > 0) {
+    throw new Error(`Missing ${missing.length} existing product(s). See ${updateSummaryPath}`);
+  }
+
+  return { updated, missing, updateSummaryPath };
+}
+
 async function verifyUpload() {
   const client = getClient();
   const { data: category, error: categoryError } = await client
@@ -727,7 +807,7 @@ async function verifyUpload() {
 
   const { data: products, error, count } = await client
     .from("products")
-    .select("id,name,mrp_price,offered_price,image_urls,description,brand_id", { count: "exact" })
+    .select("id,name,mrp_price,offered_price,image_urls,description,highlights,brand_id", { count: "exact" })
     .eq("main_category_id", category.id)
     .order("name");
   if (error) throw new Error(`products: ${error.message}`);
@@ -739,6 +819,7 @@ async function verifyUpload() {
     productsWithImages: products.filter((product) => product.image_urls?.length).length,
     productsWithoutImages: products.filter((product) => !product.image_urls?.length).length,
     productsWithDescriptions: products.filter((product) => product.description?.trim()).length,
+    productsWithHighlights: products.filter((product) => product.highlights?.length).length,
     productsWithOfferedPrice: products.filter((product) => product.offered_price !== null).length,
     byBrand: brands.map((brand) => {
       const brandProducts = products.filter((product) => product.brand_id === brand.id);
@@ -753,13 +834,14 @@ async function verifyUpload() {
       mrp: product.mrp_price,
       offered: product.offered_price,
       images: product.image_urls?.length ?? 0,
+      highlights: product.highlights?.length ?? 0,
       descriptionLines: product.description?.split(/\n/).filter(Boolean).length ?? 0,
     })),
   };
 }
 
 async function main() {
-  const command = process.argv.find((arg) => arg === "--prepare" || arg === "--upload" || arg === "--verify");
+  const command = process.argv.find((arg) => arg === "--prepare" || arg === "--upload" || arg === "--update-details" || arg === "--verify");
   if (!command) {
     usage();
     process.exitCode = 1;
@@ -789,6 +871,11 @@ async function main() {
   if (command === "--upload") {
     const result = await uploadProducts(manifest);
     console.log(JSON.stringify({ uploaded: result.uploaded.length, file: result.uploadSummaryPath }, null, 2));
+  }
+
+  if (command === "--update-details") {
+    const result = await updateProductDetails(manifest);
+    console.log(JSON.stringify({ updated: result.updated.length, missing: result.missing.length, file: result.updateSummaryPath }, null, 2));
   }
 }
 

@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
   let productsQuery = adminClient
     .from("products")
     .select("*")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .range(0, 4999);
 
   if (role !== "admin") {
     productsQuery = productsQuery.eq("is_active", true);
