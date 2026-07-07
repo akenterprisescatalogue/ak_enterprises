@@ -21,8 +21,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { ErrorPanel, LoadingPanel } from "@/components/StatusPanels";
 import { useCatalogData } from "@/hooks/useCatalogData";
 import { supabase } from "@/lib/supabase/client";
-import type { Availability, ProductWithRelations } from "@/lib/types";
-import { createSlug, formatCurrency, searchProducts, splitLines, splitTags } from "@/lib/utils";
+import type { Availability, CatalogData, ProductWithRelations } from "@/lib/types";
+import { createSlug, formatCurrency, splitLines, splitTags } from "@/lib/utils";
 
 type ProductFormState = {
   name: string;
@@ -54,6 +54,68 @@ const availabilityOptions: Availability[] = ["In Stock", "Limited", "On Order", 
 
 function isDuplicateError(error: { code?: string; message?: string } | null) {
   return error?.code === "23505" || error?.message?.toLowerCase().includes("duplicate key");
+}
+
+function getListingSearchTerms(query: string) {
+  return query
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function buildListingSearchText(data: CatalogData, product: ProductWithRelations) {
+  const mainCategory =
+    product.main_category ?? data.categories.find((category) => category.id === product.main_category_id) ?? null;
+  const brand = product.brand ?? data.brands.find((item) => item.id === product.brand_id) ?? null;
+  const subcategory = product.subcategory ?? data.subcategories.find((item) => item.id === product.subcategory_id) ?? null;
+  const secondSubcategory =
+    product.second_subcategory ??
+    (product.second_subcategory_id
+      ? data.secondSubcategories.find((item) => item.id === product.second_subcategory_id) ?? null
+      : null);
+
+  return [
+    product.name,
+    product.slug,
+    product.sku,
+    product.description,
+    product.pack_size,
+    product.availability,
+    product.main_category_id,
+    product.brand_id,
+    product.subcategory_id,
+    product.second_subcategory_id,
+    mainCategory?.name,
+    mainCategory?.slug,
+    mainCategory?.description,
+    brand?.name,
+    brand?.slug,
+    brand?.description,
+    subcategory?.name,
+    subcategory?.slug,
+    subcategory?.description,
+    secondSubcategory?.name,
+    secondSubcategory?.slug,
+    secondSubcategory?.description,
+    [mainCategory?.name, brand?.name, subcategory?.name, secondSubcategory?.name].filter(Boolean).join(" / "),
+    [mainCategory?.slug, brand?.slug, subcategory?.slug, secondSubcategory?.slug].filter(Boolean).join(" "),
+    ...product.highlights,
+    ...product.tags
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function filterEditableListings(data: CatalogData, query: string) {
+  const terms = getListingSearchTerms(query);
+  if (terms.length === 0) return data.products;
+
+  return data.products.filter((product) => {
+    const searchableText = buildListingSearchText(data, product);
+    return terms.every((term) => searchableText.includes(term));
+  });
 }
 
 export function AdminListingManager() {
@@ -99,7 +161,7 @@ export function AdminListingManager() {
   );
 
   const filteredProducts = useMemo(
-    () => (data ? searchProducts(data.products, listingSearch) : []),
+    () => (data ? filterEditableListings(data, listingSearch) : []),
     [data, listingSearch]
   );
 
@@ -936,7 +998,7 @@ export function AdminListingManager() {
             <input
               value={listingSearch}
               onChange={(event) => setListingSearch(event.target.value)}
-              placeholder="Search products, brands, categories, SKU..."
+              placeholder="Search products, brands, categories, subcategories..."
               aria-label="Search editable listings"
             />
             {listingSearch ? (
