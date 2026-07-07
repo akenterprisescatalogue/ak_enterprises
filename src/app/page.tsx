@@ -13,8 +13,9 @@ import type { FilterSelection } from "@/lib/types";
 import { filterProducts, getSelectionTitle, searchProducts } from "@/lib/utils";
 
 export default function HomePage() {
-  const { accessToken } = useAuth();
-  const { data, loading, error } = useCatalogData(accessToken);
+  const { accessToken, role, user } = useAuth();
+  const catalogCacheScope = user ? `${role}:${user.id}` : "public";
+  const { data, loading, error } = useCatalogData(accessToken, catalogCacheScope);
   const [selected, setSelected] = useState<FilterSelection>({ type: "all" });
   const [searchQuery, setSearchQuery] = useState("");
   const hasSearch = searchQuery.trim().length > 0;

@@ -12,7 +12,7 @@ import { useAuth } from "@/components/AuthProvider";
 export default function AdminListingsPage() {
   const { role, loading } = useAuth();
 
-  if (loading) return <LoadingPanel label="Checking access" />;
+  if (loading && role === "public") return <LoadingPanel label="Checking access" />;
 
   return (
     <main className="app-shell">

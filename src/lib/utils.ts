@@ -13,11 +13,15 @@ export function formatCurrency(value: number | null | undefined) {
     return "N/A";
   }
 
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  const hasDecimals = !Number.isInteger(rounded);
+
   return new Intl.NumberFormat("en-PK", {
     style: "currency",
     currency: "PKR",
-    maximumFractionDigits: 0
-  }).format(value);
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0
+  }).format(rounded);
 }
 
 export function splitLines(value: string) {

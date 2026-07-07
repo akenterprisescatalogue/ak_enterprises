@@ -10,8 +10,9 @@ import { useCatalogData } from "@/hooks/useCatalogData";
 
 export default function ProductDetailPage() {
   const params = useParams<{ slug: string }>();
-  const { accessToken } = useAuth();
-  const { data, loading, error } = useCatalogData(accessToken);
+  const { accessToken, role, user } = useAuth();
+  const catalogCacheScope = user ? `${role}:${user.id}` : "public";
+  const { data, loading, error } = useCatalogData(accessToken, catalogCacheScope);
   const product = data?.products.find((item) => item.slug === params.slug);
 
   if (loading) return <LoadingPanel label="Loading product" />;

@@ -279,8 +279,9 @@ function PrintProductCard({
 }
 
 export function CatalogPrintDialog() {
-  const { accessToken, role } = useAuth();
-  const { data, loading, error, refresh } = useCatalogData(accessToken);
+  const { accessToken, role, user } = useAuth();
+  const catalogCacheScope = user ? `${role}:${user.id}` : "public";
+  const { data, loading, error, refresh } = useCatalogData(accessToken, catalogCacheScope);
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<PrintSelection>(emptySelection);
   const canSeeOffer = role === "admin" || role === "salesman";

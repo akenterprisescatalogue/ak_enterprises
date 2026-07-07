@@ -30,6 +30,11 @@ type RoleLookupResult = {
   error: { message: string } | null;
 };
 
+type RoleCachePayload = {
+  role?: UserRole;
+  cachedAt?: number;
+};
+
 type ServerRoleResult = {
   role?: string;
   error?: string;
@@ -37,7 +42,7 @@ type ServerRoleResult = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const ROLE_CACHE_PREFIX = "ak-role-cache";
-
+const ROLE_CACHE_TTL_MS = 5 * 60 * 1000;
 async function runWithTimeout<T>(task: () => PromiseLike<T>, message: string, timeoutMs = 12000) {
   let timeoutId: number | undefined;
 
@@ -63,16 +68,25 @@ function getRoleCacheKey(userId: string) {
   return `${ROLE_CACHE_PREFIX}:${userId}`;
 }
 
-function readCachedRole(userId: string): UserRole | null {
+function getCachedRole(payload: RoleCachePayload | null): UserRole | null {
+  return payload?.role === "admin" || payload?.role === "salesman" ? payload.role : null;
+}
+
+function isRoleCacheFresh(payload: RoleCachePayload | null) {
+  return Boolean(payload?.cachedAt && Date.now() - payload.cachedAt < ROLE_CACHE_TTL_MS);
+}
+
+function readCachedRolePayload(userId: string): RoleCachePayload | null {
   try {
     const cached = window.localStorage.getItem(getRoleCacheKey(userId));
     if (!cached) return null;
-    const payload = JSON.parse(cached) as { role?: UserRole };
-    return payload.role === "admin" || payload.role === "salesman" ? payload.role : null;
+    const payload = JSON.parse(cached) as RoleCachePayload;
+    return getCachedRole(payload) ? payload : null;
   } catch {
     return null;
   }
 }
+
 
 function writeCachedRole(userId: string, nextRole: UserRole) {
   try {
@@ -187,7 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const cachedRole = readCachedRole(currentUser.id);
+        const cachedRolePayload = readCachedRolePayload(currentUser.id);
+        const cachedRole = getCachedRole(cachedRolePayload);
         if (mounted) {
           setUser(currentUser);
           setAccessToken(sessionAccessToken);
@@ -196,6 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
           }
         }
+
+        if (cachedRole && isRoleCacheFresh(cachedRolePayload)) return;
 
         const nextRole = await loadRole(currentUser, sessionAccessToken, cachedRole ?? "salesman");
         writeCachedRole(currentUser.id, nextRole);
@@ -235,14 +252,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const sessionAccessToken = session?.access_token ?? null;
-      const cachedRole = readCachedRole(currentUser.id);
+      const cachedRolePayload = readCachedRolePayload(currentUser.id);
+      const cachedRole = getCachedRole(cachedRolePayload);
 
       if (mounted) {
         setUser(currentUser);
         setAccessToken(sessionAccessToken);
         if (cachedRole) setRole(cachedRole);
-        setLoading(!cachedRole);
+        setLoading(false);
       }
+
+      if (cachedRole && isRoleCacheFresh(cachedRolePayload)) return;
 
       window.setTimeout(() => {
         if (!mounted) return;

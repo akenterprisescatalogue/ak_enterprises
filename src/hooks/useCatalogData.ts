@@ -7,12 +7,13 @@ import type { CatalogData } from "@/lib/types";
 
 const catalogCache = new Map<string, CatalogData>();
 
-function getCacheKey(accessToken?: string | null) {
-  return accessToken ? `auth:${accessToken}` : "public";
+function getCacheKey(accessToken?: string | null, cacheScope?: string) {
+  if (cacheScope) return cacheScope;
+  return accessToken ? "authenticated" : "public";
 }
 
-export function useCatalogData(accessToken?: string | null) {
-  const cacheKey = getCacheKey(accessToken);
+export function useCatalogData(accessToken?: string | null, cacheScope?: string) {
+  const cacheKey = getCacheKey(accessToken, cacheScope);
   const [data, setData] = useState<CatalogData | null>(() => catalogCache.get(cacheKey) ?? null);
   const [loading, setLoading] = useState(() => !catalogCache.has(cacheKey));
   const [error, setError] = useState<string | null>(null);

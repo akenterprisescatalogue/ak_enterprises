@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Film,
@@ -51,6 +51,136 @@ const emptyForm: ProductFormState = {
 };
 
 const availabilityOptions: Availability[] = ["In Stock", "Limited", "On Order", "Unavailable"];
+const LISTING_DRAFT_KEY = "ak-admin-listing-draft";
+
+type ListingDraftState = {
+  selectedCategoryId: string;
+  selectedBrandId: string;
+  selectedSubcategoryId: string;
+  selectedSecondSubcategoryId: string;
+  newCategoryName: string;
+  newBrandName: string;
+  newSubcategoryName: string;
+  newSecondSubcategoryName: string;
+  editingId: string | null;
+  form: ProductFormState;
+  imageUrls: string[];
+  videoUrls: string[];
+  listingSearch: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function readAvailability(value: unknown): Availability {
+  return typeof value === "string" && availabilityOptions.includes(value as Availability)
+    ? (value as Availability)
+    : "In Stock";
+}
+
+function readListingDraft(): ListingDraftState | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = window.sessionStorage.getItem(LISTING_DRAFT_KEY);
+    if (!stored) return null;
+
+    const payload = JSON.parse(stored) as unknown;
+    if (!isRecord(payload)) return null;
+
+    const formPayload = isRecord(payload.form) ? payload.form : {};
+
+    return {
+      selectedCategoryId: readString(payload.selectedCategoryId),
+      selectedBrandId: readString(payload.selectedBrandId),
+      selectedSubcategoryId: readString(payload.selectedSubcategoryId),
+      selectedSecondSubcategoryId: readString(payload.selectedSecondSubcategoryId),
+      newCategoryName: readString(payload.newCategoryName),
+      newBrandName: readString(payload.newBrandName),
+      newSubcategoryName: readString(payload.newSubcategoryName),
+      newSecondSubcategoryName: readString(payload.newSecondSubcategoryName),
+      editingId: typeof payload.editingId === "string" ? payload.editingId : null,
+      form: {
+        name: readString(formPayload.name),
+        sku: readString(formPayload.sku),
+        description: readString(formPayload.description),
+        highlights: readString(formPayload.highlights),
+        mrp_price: readString(formPayload.mrp_price),
+        offered_price: readString(formPayload.offered_price),
+        pack_size: readString(formPayload.pack_size),
+        availability: readAvailability(formPayload.availability),
+        tags: readString(formPayload.tags),
+        is_active: typeof formPayload.is_active === "boolean" ? formPayload.is_active : true
+      },
+      imageUrls: readStringArray(payload.imageUrls),
+      videoUrls: readStringArray(payload.videoUrls),
+      listingSearch: readString(payload.listingSearch)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isListingDraftEmpty(draft: ListingDraftState) {
+  const hasHierarchy = Boolean(
+    draft.selectedCategoryId ||
+      draft.selectedBrandId ||
+      draft.selectedSubcategoryId ||
+      draft.selectedSecondSubcategoryId ||
+      draft.newCategoryName.trim() ||
+      draft.newBrandName.trim() ||
+      draft.newSubcategoryName.trim() ||
+      draft.newSecondSubcategoryName.trim()
+  );
+  const hasFormValue = Object.entries(draft.form).some(([key, value]) => {
+    if (key === "availability") return value !== emptyForm.availability;
+    if (key === "is_active") return value !== emptyForm.is_active;
+    return typeof value === "string" && value.trim().length > 0;
+  });
+
+  return (
+    !draft.editingId &&
+    !hasHierarchy &&
+    !hasFormValue &&
+    draft.imageUrls.length === 0 &&
+    draft.videoUrls.length === 0 &&
+    !draft.listingSearch.trim()
+  );
+}
+
+function clearListingDraft() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.removeItem(LISTING_DRAFT_KEY);
+  } catch {
+    // Draft persistence is a convenience; the form still works without storage access.
+  }
+}
+
+function writeListingDraft(draft: ListingDraftState) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (isListingDraftEmpty(draft)) {
+      window.sessionStorage.removeItem(LISTING_DRAFT_KEY);
+      return;
+    }
+
+    window.sessionStorage.setItem(LISTING_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Draft persistence is a convenience; the form still works without storage access.
+  }
+}
 
 function isDuplicateError(error: { code?: string; message?: string } | null) {
   return error?.code === "23505" || error?.message?.toLowerCase().includes("duplicate key");
@@ -120,30 +250,39 @@ function filterEditableListings(data: CatalogData, query: string) {
 
 export function AdminListingManager() {
   const searchParams = useSearchParams();
-  const { accessToken } = useAuth();
-  const { data, loading, error, refresh } = useCatalogData(accessToken);
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [selectedBrandId, setSelectedBrandId] = useState("");
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
-  const [selectedSecondSubcategoryId, setSelectedSecondSubcategoryId] = useState("");
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newBrandName, setNewBrandName] = useState("");
-  const [newSubcategoryName, setNewSubcategoryName] = useState("");
-  const [newSecondSubcategoryName, setNewSecondSubcategoryName] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ProductFormState>(emptyForm);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [videoUrls, setVideoUrls] = useState<string[]>([]);
+  const { accessToken, role, user } = useAuth();
+  const catalogCacheScope = user ? `${role}:${user.id}` : "public";
+  const { data, loading, error, refresh } = useCatalogData(accessToken, catalogCacheScope);
+  const editId = searchParams.get("edit");
+  const initialDraft = useMemo(() => readListingDraft(), []);
+  const appliedEditIdRef = useRef<string | null>(
+    initialDraft?.editingId && initialDraft.editingId === editId ? editId : null
+  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState(() => initialDraft?.selectedCategoryId ?? "");
+  const [selectedBrandId, setSelectedBrandId] = useState(() => initialDraft?.selectedBrandId ?? "");
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(
+    () => initialDraft?.selectedSubcategoryId ?? ""
+  );
+  const [selectedSecondSubcategoryId, setSelectedSecondSubcategoryId] = useState(
+    () => initialDraft?.selectedSecondSubcategoryId ?? ""
+  );
+  const [newCategoryName, setNewCategoryName] = useState(() => initialDraft?.newCategoryName ?? "");
+  const [newBrandName, setNewBrandName] = useState(() => initialDraft?.newBrandName ?? "");
+  const [newSubcategoryName, setNewSubcategoryName] = useState(() => initialDraft?.newSubcategoryName ?? "");
+  const [newSecondSubcategoryName, setNewSecondSubcategoryName] = useState(
+    () => initialDraft?.newSecondSubcategoryName ?? ""
+  );
+  const [editingId, setEditingId] = useState<string | null>(() => initialDraft?.editingId ?? null);
+  const [form, setForm] = useState<ProductFormState>(() => initialDraft?.form ?? emptyForm);
+  const [imageUrls, setImageUrls] = useState<string[]>(() => initialDraft?.imageUrls ?? []);
+  const [videoUrls, setVideoUrls] = useState<string[]>(() => initialDraft?.videoUrls ?? []);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [listingSearch, setListingSearch] = useState("");
-
-  const editId = searchParams.get("edit");
-
+  const [listingSearch, setListingSearch] = useState(() => initialDraft?.listingSearch ?? "");
   const brandOptions = useMemo(
     () => data?.brands.filter((brand) => brand.main_category_id === selectedCategoryId) ?? [],
     [data, selectedCategoryId]
@@ -169,7 +308,40 @@ export function AdminListingManager() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  useEffect(() => {
+    writeListingDraft({
+      selectedCategoryId,
+      selectedBrandId,
+      selectedSubcategoryId,
+      selectedSecondSubcategoryId,
+      newCategoryName,
+      newBrandName,
+      newSubcategoryName,
+      newSecondSubcategoryName,
+      editingId,
+      form,
+      imageUrls,
+      videoUrls,
+      listingSearch
+    });
+  }, [
+    selectedCategoryId,
+    selectedBrandId,
+    selectedSubcategoryId,
+    selectedSecondSubcategoryId,
+    newCategoryName,
+    newBrandName,
+    newSubcategoryName,
+    newSecondSubcategoryName,
+    editingId,
+    form,
+    imageUrls,
+    videoUrls,
+    listingSearch
+  ]);
+
   function resetForm() {
+    clearListingDraft();
     setEditingId(null);
     setForm(emptyForm);
     setImageUrls([]);
@@ -179,7 +351,9 @@ export function AdminListingManager() {
     setMediaError(null);
   }
 
-  function startEdit(product: ProductWithRelations) {
+  function startEdit(product: ProductWithRelations, options: { scroll?: boolean } = {}) {
+    const { scroll = true } = options;
+
     setEditingId(product.id);
     setSelectedCategoryId(product.main_category_id);
     setSelectedBrandId(product.brand_id);
@@ -199,13 +373,23 @@ export function AdminListingManager() {
       tags: product.tags.join(", "),
       is_active: product.is_active
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   useEffect(() => {
-    if (!data || !editId) return;
+    if (!editId) {
+      appliedEditIdRef.current = null;
+      return;
+    }
+
+    if (!data || appliedEditIdRef.current === editId) return;
+
     const product = data.products.find((item) => item.id === editId);
-    if (product) startEdit(product);
+    if (product) {
+      appliedEditIdRef.current = editId;
+      startEdit(product);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, editId]);
 
